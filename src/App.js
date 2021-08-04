@@ -2,7 +2,7 @@ import logo from './logo.svg';
 import React, {useState, useEffect} from "react";
 import './App.css';
 import {Table, Col, Container, Row, Modal, Button, Form} from "react-bootstrap";
-import {deleteClient, fetClientList, searchClient} from "./api"
+import {deleteClient, getClientInfo, fetClientList, searchClient} from "./api"
 import {ToastContainer, toast} from "react-toastify"
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -11,11 +11,7 @@ const App = () => {
     const [clients, setClients] = useState([])
     const [show, setShow] = useState(false);
     const [profileInfo, setProfileInfo] = useState({})
-    const [searchParam, setSearchParams] = useState({
-        CIN: "",
-        name: "",
-        email: ""
-    })
+    const [searchParam, setSearchParams] = useState({CIN: "", name: "", email: ""})
     const handleClose = () => setShow(false);
     const handleShow = () => setShow(true);
     const showToast = (message, type) => {
@@ -68,7 +64,7 @@ const App = () => {
                     </Form.Group>
                     <Form.Group className="mb-3" controlId="formBasicEmail">
                         <Form.Label>Company CIN</Form.Label>
-                        <Form.Control defaultValue={searchParam.CIN} type={"text"} placeholder="Enter CIN"
+                        <Form.Control defaultValue={searchParam.CIN} size={21} type={"text"} placeholder="Enter CIN"
                                       onChange={(event => {
                                           setSearchParams(prevState => {
                                               return {
@@ -78,7 +74,7 @@ const App = () => {
                                           })
                                       })}/>
                         <Form.Text className="text-muted">
-                            You should enter full CIN number which is 21 characters in length
+                            You should enter full CIN which is 21 characters in length
                         </Form.Text>
                     </Form.Group>
                     <Form.Group className="mb-3" controlId="formBasicEmail">
@@ -113,7 +109,6 @@ const App = () => {
                     </Button>
                 </Form>
                 <ToastContainer/>
-
                 <Table striped bordered hover size="sm" style={{marginTop: '24px'}}>
                     <thead>
                     <tr>
@@ -122,7 +117,7 @@ const App = () => {
                         <th>Activity</th>
                         <th>CIN</th>
                         <th>Email</th>
-                        <th>Edit</th>
+                        <th>View/Edit</th>
                         <th>Delete</th>
                     </tr>
                     </thead>
@@ -139,8 +134,15 @@ const App = () => {
                                 <td>
                                     <img style={{width: "48px", padding: "8px", height: "48px"}}
                                          onClick={() => {
-                                             handleShow()
-                                             setProfileInfo(row)
+                                             getClientInfo(row.CIN).then(response => {
+                                                 const statusCode = response.status
+                                                 if (statusCode === 200) {
+                                                     showToast(response.data.message, 'success')
+                                                     handleShow()
+                                                     setProfileInfo(response.data.data)
+                                                 }                                }).catch(error => {
+                                                 showToast(error.message, 'error')
+                                             })
                                          }}
                                          src={`https://freeiconshop.com/wp-content/uploads/edd/edit-flat.png`}/>
                                 </td>
@@ -148,6 +150,7 @@ const App = () => {
                                 <td>
                                     <img style={{width: "48px", padding: "8px", height: "48px"}}
                                          onClick={() => {
+                                             setProfileInfo(row)
                                              deleteClient(row.CIN).then(response => {
                                                  showToast(response.data.message, 'error')
                                                  loadClientList()
