@@ -1,23 +1,104 @@
 import logo from './logo.svg';
 import React, {useState, useEffect} from "react";
 import './App.css';
-import {Table, Col, Container, Row, Modal, Button, Form} from "react-bootstrap";
-import {deleteClient, getClientInfo, fetClientList, searchClient} from "./api"
+import {Table, Container, Modal, Button, Form} from "react-bootstrap";
+import {deleteClient, getClientInfo, createClient, fetClientList, searchClient, updateClient} from "./api"
 import {ToastContainer, toast} from "react-toastify"
 import 'react-toastify/dist/ReactToastify.css';
 
+const newProfileInfo = {
+    profileUrl: "",
+    name: "",
+    activity: "",
+    CIN: "",
+    registrationDate: "",
+    category: "",
+    subCategory: "",
+    class: "",
+    ROC: "",
+    status: "",
+    isCompanyListed: "",
+    authorizedCapital: "",
+    paidUpCapital: "",
+    contactDetail: {
+        state: "",
+        zipCode: "",
+        country: "",
+        address: "",
+        email: ""
+    }
+}
+
+let disableEditFields = ["CIN", "_id"]
 
 const App = () => {
+    // set all clients information
     const [clients, setClients] = useState([])
+
+    // show or hide the client profile info box
     const [show, setShow] = useState(false);
+
+    // when isNewProfile == false  - user cannot edit CIN AND _ID
+    const [isNewProfile, setIsNewProfile] = useState(false)
+
+    // sets profile info for currently handing client
     const [profileInfo, setProfileInfo] = useState({})
+
+    // holds search parameters
     const [searchParam, setSearchParams] = useState({CIN: "", name: "", email: ""})
-    const handleClose = () => setShow(false);
-    const handleShow = () => setShow(true);
-    const showToast = (message, type) => {
+    /**
+     * updates profile information
+     * @param {Object} event
+     * @param {String} clientId
+     */
+    const saveProfileChanges = (event, clientId) => {
+        updateClient(clientId, profileInfo).then(response => {
+            if (response.status === 200) {
+                if (response.data.status === "success") {
+                    showToast(response.data.message, 'success')
+                    setShow(false)
+                    loadClientList()
+                }
+                if (response.data.status === "failed") {
+                    showToast(response.data.error.errorDescription, 'error', 5000)
+                }
+            }
+        }).catch(error => {
+            showToast(error.message, 'error')
+        })
+    }
+
+    /**
+     * create new client profile
+     */
+    const createNewProfile = () => {
+        createClient(profileInfo).then(response => {
+            if (response.status === 201) {
+                if (response.data.status === "success") {
+                    showToast(response.data.message, 'success')
+                    handleClose()
+                    loadClientList()
+                }
+            }
+            if (response.data.status === "failed") {
+                showToast(response.data.error.errorDescription || response.data.error.errorTitle, 'error', 5000)
+            }
+        }).catch(error => {
+            showToast(error.message, 'error')
+        })
+    };
+    const handleClose = () => setShow(false)
+    const handleShow = () => setShow(true)
+
+    /**
+     * @param {String} message
+     * @param {String} type
+     * @param {Number} duration
+     */
+    const showToast = (message, type, duration = 2000) => {
         toast[type](`${message}`, {
             position: "top-right",
-            autoClose: 2000,
+            autoClose: duration,
             hideProgressBar: false,
             closeOnClick: true,
             pauseOnHover: true,
@@ -25,6 +106,7 @@ const App = () => {
             progress: undefined,
         });
     }
+
     const loadClientList = () => {
         fetClientList().then(response => {
             const statusCode = response.status
@@ -37,15 +119,14 @@ const App = () => {
         })
     }
     useEffect(() => {
+        // load client list on page load
         loadClientList()
     }, [])
 
     return (
         <Container>
             <div>
-                <Form onSubmit={() => {
-                    console.log(searchParam)
-                }}>
+                <Form style={{marginTop: "20px", backgroundColor: "#E8EAF6", padding: "20px", borderRadius: "7px"}}>
                     <Form.Label as="legend" style={{color: 'green'}} size="lg"> Search</Form.Label>
                     <Form.Group className="mb-3" controlId="formBasicEmail">
                         <Form.Label>Company Name</Form.Label>
@@ -94,6 +175,7 @@ const App = () => {
                     </Form.Group>
 
 
+                    {/* search client list based on user given criteria*/}
                     <Button variant="primary" type="button" onClick={(event) => {
                         searchClient(searchParam).then(response => {
                             const statusCode = response.status
@@ -108,8 +190,21 @@ const App = () => {
                         Search
                     </Button>
                 </Form>
+                <Button style={{margin: "12px 12px 12px 0px", float: "right"}} variant={"success"} type={"button"}
+                        onClick={() => {
+                            setProfileInfo(newProfileInfo)
+                            setIsNewProfile(true)
+                            disableEditFields = ["_id"]
+                            handleShow()
+                        }}> Add new company</Button>
+                <Button style={{margin: "12px 12px 0px 0px", float: "right"}} variant={"outline-primary"}
+                        type={"button"}
+                        onClick={() => {
+                            loadClientList()
+                        }}> <img style={{maxHeight: "22px"}}
+                                 src={`https://image.flaticon.com/icons/png/32/3208/3208747.png`}/>&nbsp;Reload</Button>
                 <ToastContainer/>
-                <Table striped bordered hover size="sm" style={{marginTop: '24px'}}>
+                <Table striped bordered hover size="sm" style={{marginTop: '24px', backgroundColor: "#ECEFF1"}}>
                     <thead>
                     <tr>
                         <th>#</th>
@@ -124,7 +219,7 @@ const App = () => {
                     <tbody>
                     {
                         clients.map((row, index) => {
-                            return <tr key={row.name}>
+                            return <tr key={row.CIN}>
                                 <td>{index + 1}</td>
                                 <td>{row.name}</td>
                                 <td>{row.activity}</td>
@@ -134,17 +229,20 @@ const App = () => {
                                 <td>
                                     <img style={{width: "48px", padding: "8px", height: "48px"}}
                                          onClick={() => {
+                                             setIsNewProfile(false)
                                              getClientInfo(row.CIN).then(response => {
                                                  const statusCode = response.status
                                                  if (statusCode === 200) {
+                                                     disableEditFields = ["CIN", "_id"]
                                                      showToast(response.data.message, 'success')
-                                                     handleShow()
                                                      setProfileInfo(response.data.data)
-                                                 }                                }).catch(error => {
+                                                     handleShow()
+                                                 }
+                                             }).catch(error => {
                                                  showToast(error.message, 'error')
                                              })
                                          }}
-                                         src={`https://freeiconshop.com/wp-content/uploads/edd/edit-flat.png`}/>
+                                         src={`https://image.flaticon.com/icons/png/128/1159/1159633.png`}/>
                                 </td>
 
                                 <td>
@@ -158,8 +256,7 @@ const App = () => {
                                                  showToast(`Something went wrong while deleting client`, 'error')
                                              })
                                          }}
-                                         src={`https://lh3.googleusercontent.com/G2jzG8a6-GAA4yhxx3XMJfPXsm6_pluyeEWKr9I5swUGF62d2xo_Qg3Kdnu00HAmDQ`}/>
-
+                                         src={`https://image.flaticon.com/icons/png/128/1799/1799391.png`}/>
                                 </td>
                             </tr>
                         })
@@ -174,17 +271,29 @@ const App = () => {
                     <Modal.Body>
                         <Table striped bordered hover size="sm">
                             <tbody>
+                            {/* generates table row from client list response */}
                             {Object.keys(profileInfo).filter(column => column !== "__V").map(column => {
                                 return <tr>
                                     <td>{column.toUpperCase()}</td>
+                                    {/* when column is contactDetail create nested table to show email, country, zip code */}
                                     {column !== "contactDetail" ?
-                                        <td><input defaultValue={profileInfo[column]} style={{minWidth: "100%"}}/>
+                                        <td><input
+                                            onChange={(event) => {
+                                                profileInfo[column] = event.target.value
+                                                setProfileInfo({...profileInfo})
+                                                console.log(profileInfo)
+                                            }}
+                                            disabled={disableEditFields.includes(column)}
+                                            defaultValue={profileInfo[column]} style={{minWidth: "100%"}}/>
+
                                         </td> : Object.keys(profileInfo[column]).map(contactDetailColumn => {
                                             return <tr>
                                                 <td>{contactDetailColumn.toUpperCase()}</td>
                                                 <td style={{width: "100%"}}>
                                                     <input defaultValue={profileInfo[column][contactDetailColumn]}
-                                                           onChange={() => {
+                                                           onChange={(event) => {
+                                                               profileInfo["contactDetail"][contactDetailColumn] = event.target.value
+                                                               setProfileInfo({...profileInfo})
                                                            }} style={{minWidth: "100%"}}/>
                                                 </td>
                                             </tr>
@@ -199,7 +308,16 @@ const App = () => {
                         <Button variant="secondary" onClick={handleClose}>
                             Close
                         </Button>
-                        <Button variant="primary" onClick={handleClose}>
+                        <Button variant="primary" onClick={(event) => {
+                            /*
+                            * if isNewProfile == true then createNewProfile else updateProfile
+                            * */
+                            if (isNewProfile) {
+                                createNewProfile()
+                            } else {
+                                saveProfileChanges(event, profileInfo.CIN)
+                            }
+                        }}>
                             Save Changes
                         </Button>
                     </Modal.Footer>
